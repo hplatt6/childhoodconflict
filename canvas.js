@@ -170,7 +170,7 @@ window.addEventListener('message', function(event) {
                 const dataURL = myCanvas.toDataURL('image/png');
                 const base64Data = dataURL.replace(/^data:image\/(png|jpeg);base64,/, '');
 
-                const pipedreamEndpoint = 'https://eo19wfj05vqf6o9.m.pipedream.net';
+                const pipedreamEndpoint = 'https://eoei8lx0gt8zd0l.m.pipedream.net';
                 
                 console.log("Sending to Pipedream with uniqueId:", uniqueId);
 
