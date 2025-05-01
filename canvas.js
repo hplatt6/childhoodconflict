@@ -1,12 +1,13 @@
 (function() {
     function initCanvas() {
-        const canvas = document.getElementById('drawingCanvas');
+        var canvas = document.getElementById('drawingCanvas');
         if (!canvas) {
             console.error("Canvas element not found!");
             return;
         }
 
         let uniqueId = null;
+
         window.addEventListener('message', function(event) {
             if (event.data && event.data.type === 'setUniqueId') {
                 console.log("Received uniqueId from parent:", event.data.uniqueId);
@@ -14,43 +15,45 @@
             }
         }, false);
 
-        const ctx = canvas.getContext('2d');
+        var ctx = canvas.getContext('2d');
         if (!ctx) {
             console.error("Canvas context not available!");
             return;
         }
 
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.imageSmoothingEnabled = true;
 
-        let isDrawing = false;
-        let brushColor = '#000000';
-        let brushSize = 5;
+        var isDrawing = false;
+        var brushColor = '#000000';
+        var brushSize = 5;
+        const resolutionMultiplier = 2;
 
         function setCanvasSize() {
             const container = document.getElementById('canvasContainer');
             const displayWidth = container.offsetWidth;
             const displayHeight = displayWidth * 3 / 5;
 
-            const resolutionMultiplier = 3;
+            canvas.style.width = `${displayWidth}px`;
+            canvas.style.height = `${displayHeight}px`;
 
             canvas.width = displayWidth * resolutionMultiplier;
             canvas.height = displayHeight * resolutionMultiplier;
 
-            canvas.style.width = `${displayWidth}px`;
-            canvas.style.height = `${displayHeight}px`;
-
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform before scale
             ctx.scale(resolutionMultiplier, resolutionMultiplier);
-
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
         }
 
         setCanvasSize();
-        window.addEventListener('resize', setCanvasSize);
+        window.addEventListener('resize', () => {
+            saveCanvasToStorage();
+            setCanvasSize();
+            restoreCanvasFromStorage();
+        });
 
         function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width / resolutionMultiplier, canvas.height / resolutionMultiplier);
         }
 
         function setBrushColor(color) {
@@ -68,59 +71,70 @@
         setBrushSize(brushSize);
 
         function getMousePos(canvas, e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            return {
-                x: (e.clientX - rect.left) * scaleX,
-                y: (e.clientY - rect.top) * scaleY
-            };
+            var rect = canvas.getBoundingClientRect();
+            var scaleX = canvas.width / rect.width;
+            var scaleY = canvas.height / rect.height;
+            var x = (e.clientX - rect.left) * scaleX / resolutionMultiplier;
+            var y = (e.clientY - rect.top) * scaleY / resolutionMultiplier;
+
+            return { x: x, y: y };
         }
 
         canvas.addEventListener('mousedown', function(e) {
             isDrawing = true;
             ctx.beginPath();
-            const pos = getMousePos(canvas, e);
+            var pos = getMousePos(canvas, e);
             ctx.moveTo(pos.x, pos.y);
             e.preventDefault();
+            ctx.strokeStyle = brushColor;
+            ctx.fillStyle = brushColor;
+            ctx.lineWidth = brushSize;
         });
 
         canvas.addEventListener('mousemove', function(e) {
             if (isDrawing) {
-                const pos = getMousePos(canvas, e);
+                var pos = getMousePos(canvas, e);
                 ctx.lineTo(pos.x, pos.y);
                 ctx.stroke();
             }
         });
 
-        canvas.addEventListener('mouseup', () => isDrawing = false);
-        canvas.addEventListener('mouseout', () => isDrawing = false);
+        canvas.addEventListener('mouseup', function() {
+            isDrawing = false;
+        });
+
+        canvas.addEventListener('mouseout', function() {
+            isDrawing = false;
+        });
 
         function handleTouchStart(e) {
             e.preventDefault();
             isDrawing = true;
             ctx.beginPath();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            ctx.moveTo(
-                (touch.clientX - rect.left) * scaleX,
-                (touch.clientY - rect.top) * scaleY
-            );
+            var rect = canvas.getBoundingClientRect();
+            var touch = e.touches[0];
+            var scaleX = canvas.width / rect.width;
+            var scaleY = canvas.height / rect.height;
+            var x = (touch.clientX - rect.left) * scaleX / resolutionMultiplier;
+            var y = (touch.clientY - rect.top) * scaleY / resolutionMultiplier;
+
+            ctx.moveTo(x, y);
+            ctx.strokeStyle = brushColor;
+            ctx.fillStyle = brushColor;
+            ctx.lineWidth = brushSize;
         }
 
         function handleTouchMove(e) {
             e.preventDefault();
             if (isDrawing) {
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches[0];
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                ctx.lineTo(
-                    (touch.clientX - rect.left) * scaleX,
-                    (touch.clientY - rect.top) * scaleY
-                );
+                var rect = canvas.getBoundingClientRect();
+                var touch = e.touches[0];
+                var scaleX = canvas.width / rect.width;
+                var scaleY = canvas.height / rect.height;
+                var x = (touch.clientX - rect.left) * scaleX / resolutionMultiplier;
+                var y = (touch.clientY - rect.top) * scaleY / resolutionMultiplier;
+
+                ctx.lineTo(x, y);
                 ctx.stroke();
             }
         }
@@ -135,17 +149,22 @@
         canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
         document.getElementById('colorPicker').addEventListener('input', function() {
-            setBrushColor(this.value);
+            brushColor = this.value;
+            ctx.strokeStyle = brushColor;
+            ctx.fillStyle = brushColor;
         });
 
         document.getElementById('colorButtons').addEventListener('click', function(e) {
             if (e.target.tagName === 'BUTTON') {
-                setBrushColor(e.target.dataset.color);
+                brushColor = e.target.dataset.color;
+                ctx.strokeStyle = brushColor;
+                ctx.fillStyle = brushColor;
             }
         });
 
         document.getElementById('brushSizeSlider').addEventListener('input', function() {
-            setBrushSize(this.value);
+            brushSize = this.value;
+            ctx.lineWidth = brushSize;
         });
 
         document.getElementById('clearButton').addEventListener('click', function(e) {
@@ -154,9 +173,12 @@
         });
 
         let qualtricsId = "unknown";
+
         if (typeof Qualtrics !== 'undefined' && typeof Qualtrics.SurveyEngine !== 'undefined') {
             qualtricsId = Qualtrics.SurveyEngine.getEmbeddedData('qualtricsID');
             console.log("Qualtrics ID: ", qualtricsId);
+        } else {
+            console.log("Qualtrics not detected. Using default ID.");
         }
 
         function sendBase64ToPipedream() {
@@ -164,13 +186,16 @@
             if (myCanvas) {
                 const dataURL = myCanvas.toDataURL('image/png');
                 const base64Data = dataURL.replace(/^data:image\/(png|jpeg);base64,/, '');
+
                 const pipedreamEndpoint = 'https://eoei8lx0gt8zd0l.m.pipedream.net';
 
                 console.log("Sending to Pipedream with uniqueId:", uniqueId);
 
                 fetch(pipedreamEndpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
                         imageData: base64Data,
                         uniqueId: uniqueId || "missing-id"
@@ -202,43 +227,43 @@
             }
         }
 
-        const saveButton = document.getElementById("saveButton");
+        var saveButton = document.getElementById("saveButton");
         if (saveButton) {
             saveButton.addEventListener("click", sendBase64ToPipedream);
         } else {
             console.error("Save button not found");
         }
 
-        function handleOrientationChange() {
-            console.log("Orientation change detected");
-            if (localStorage.getItem('canvasData')) {
-                const savedData = JSON.parse(localStorage.getItem('canvasData'));
-                const img = new Image();
-                img.onload = function() {
-                    setTimeout(() => {
-                        setCanvasSize();
-                        ctx.drawImage(img, 0, 0, savedData.width, savedData.height, 0, 0, canvas.width, canvas.height);
-                    }, 100);
-                };
-                img.src = savedData.data;
-            } else {
-                setCanvasSize();
-            }
-        }
-
-        window.addEventListener('orientationchange', function() {
+        function saveCanvasToStorage() {
             localStorage.setItem('canvasData', JSON.stringify({
                 data: canvas.toDataURL(),
                 width: canvas.width,
                 height: canvas.height
             }));
-            handleOrientationChange();
+        }
+
+        function restoreCanvasFromStorage() {
+            if (localStorage.getItem('canvasData')) {
+                var savedData = JSON.parse(localStorage.getItem('canvasData'));
+                var img = new Image();
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0, canvas.width / resolutionMultiplier, canvas.height / resolutionMultiplier);
+                };
+                img.src = savedData.data;
+            }
+        }
+
+        window.addEventListener('orientationchange', function() {
+            saveCanvasToStorage();
+            setTimeout(() => {
+                setCanvasSize();
+                restoreCanvasFromStorage();
+            }, 200);
         });
 
-        if (localStorage.getItem('canvasData')) {
-            handleOrientationChange();
-        }
+        restoreCanvasFromStorage();
     }
 
     initCanvas();
 })();
+
