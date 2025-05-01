@@ -1,59 +1,54 @@
-(function() {
+(function () {
     function initCanvas() {
-        var canvas = document.getElementById('drawingCanvas');
+        const canvas = document.getElementById('drawingCanvas');
         if (!canvas) {
             console.error("Canvas element not found!");
             return;
         }
 
         let uniqueId = null;
+        let ctx = canvas.getContext('2d');
 
-        window.addEventListener('message', function(event) {
+        if (!ctx) {
+            console.error("Canvas context not available!");
+            return;
+        }
+
+        // Receive uniqueId from parent
+        window.addEventListener('message', function (event) {
             if (event.data && event.data.type === 'setUniqueId') {
                 console.log("Received uniqueId from parent:", event.data.uniqueId);
                 uniqueId = event.data.uniqueId;
             }
         }, false);
 
-        var ctx = canvas.getContext('2d');
-        if (!ctx) {
-            console.error("Canvas context not available!");
-            return;
-        }
-
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.imageSmoothingEnabled = true;
-
-        var isDrawing = false;
-        var brushColor = '#000000';
-        var brushSize = 5;
-        const resolutionMultiplier = 2;
+        let isDrawing = false;
+        let brushColor = '#000000';
+        let brushSize = 5;
 
         function setCanvasSize() {
             const container = document.getElementById('canvasContainer');
-            const displayWidth = container.offsetWidth;
-            const displayHeight = displayWidth * 3 / 5;
+            const width = container.offsetWidth;
+            const aspectRatio = 5 / 3;
+            const height = width / aspectRatio;
 
-            canvas.style.width = `${displayWidth}px`;
-            canvas.style.height = `${displayHeight}px`;
+            const ratio = window.devicePixelRatio || 1;
 
-            canvas.width = displayWidth * resolutionMultiplier;
-            canvas.height = displayHeight * resolutionMultiplier;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
 
-            ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform before scale
-            ctx.scale(resolutionMultiplier, resolutionMultiplier);
+            canvas.width = width * ratio;
+            canvas.height = height * ratio;
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any transforms
+            ctx.scale(ratio, ratio);
         }
 
         setCanvasSize();
-        window.addEventListener('resize', () => {
-            saveCanvasToStorage();
-            setCanvasSize();
-            restoreCanvasFromStorage();
-        });
+        window.addEventListener('resize', setCanvasSize);
 
         function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width / resolutionMultiplier, canvas.height / resolutionMultiplier);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
         function setBrushColor(color) {
@@ -71,39 +66,35 @@
         setBrushSize(brushSize);
 
         function getMousePos(canvas, e) {
-            var rect = canvas.getBoundingClientRect();
-            var scaleX = canvas.width / rect.width;
-            var scaleY = canvas.height / rect.height;
-            var x = (e.clientX - rect.left) * scaleX / resolutionMultiplier;
-            var y = (e.clientY - rect.top) * scaleY / resolutionMultiplier;
-
-            return { x: x, y: y };
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            return { x: x / scaleX, y: y / scaleY };
         }
 
-        canvas.addEventListener('mousedown', function(e) {
+        canvas.addEventListener('mousedown', function (e) {
             isDrawing = true;
             ctx.beginPath();
-            var pos = getMousePos(canvas, e);
+            const pos = getMousePos(canvas, e);
             ctx.moveTo(pos.x, pos.y);
             e.preventDefault();
-            ctx.strokeStyle = brushColor;
-            ctx.fillStyle = brushColor;
-            ctx.lineWidth = brushSize;
         });
 
-        canvas.addEventListener('mousemove', function(e) {
+        canvas.addEventListener('mousemove', function (e) {
             if (isDrawing) {
-                var pos = getMousePos(canvas, e);
+                const pos = getMousePos(canvas, e);
                 ctx.lineTo(pos.x, pos.y);
                 ctx.stroke();
             }
         });
 
-        canvas.addEventListener('mouseup', function() {
+        canvas.addEventListener('mouseup', function () {
             isDrawing = false;
         });
 
-        canvas.addEventListener('mouseout', function() {
+        canvas.addEventListener('mouseout', function () {
             isDrawing = false;
         });
 
@@ -111,30 +102,25 @@
             e.preventDefault();
             isDrawing = true;
             ctx.beginPath();
-            var rect = canvas.getBoundingClientRect();
-            var touch = e.touches[0];
-            var scaleX = canvas.width / rect.width;
-            var scaleY = canvas.height / rect.height;
-            var x = (touch.clientX - rect.left) * scaleX / resolutionMultiplier;
-            var y = (touch.clientY - rect.top) * scaleY / resolutionMultiplier;
-
-            ctx.moveTo(x, y);
-            ctx.strokeStyle = brushColor;
-            ctx.fillStyle = brushColor;
-            ctx.lineWidth = brushSize;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
+            ctx.moveTo(x / scaleX, y / scaleY);
         }
 
         function handleTouchMove(e) {
             e.preventDefault();
             if (isDrawing) {
-                var rect = canvas.getBoundingClientRect();
-                var touch = e.touches[0];
-                var scaleX = canvas.width / rect.width;
-                var scaleY = canvas.height / rect.height;
-                var x = (touch.clientX - rect.left) * scaleX / resolutionMultiplier;
-                var y = (touch.clientY - rect.top) * scaleY / resolutionMultiplier;
-
-                ctx.lineTo(x, y);
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const x = (touch.clientX - rect.left) * scaleX;
+                const y = (touch.clientY - rect.top) * scaleY;
+                ctx.lineTo(x / scaleX, y / scaleY);
                 ctx.stroke();
             }
         }
@@ -148,59 +134,42 @@
         canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
         canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
-        document.getElementById('colorPicker').addEventListener('input', function() {
-            brushColor = this.value;
-            ctx.strokeStyle = brushColor;
-            ctx.fillStyle = brushColor;
+        document.getElementById('colorPicker').addEventListener('input', function () {
+            setBrushColor(this.value);
         });
 
-        document.getElementById('colorButtons').addEventListener('click', function(e) {
+        document.getElementById('colorButtons').addEventListener('click', function (e) {
             if (e.target.tagName === 'BUTTON') {
-                brushColor = e.target.dataset.color;
-                ctx.strokeStyle = brushColor;
-                ctx.fillStyle = brushColor;
+                setBrushColor(e.target.dataset.color);
             }
         });
 
-        document.getElementById('brushSizeSlider').addEventListener('input', function() {
-            brushSize = this.value;
-            ctx.lineWidth = brushSize;
+        document.getElementById('brushSizeSlider').addEventListener('input', function () {
+            setBrushSize(this.value);
         });
 
-        document.getElementById('clearButton').addEventListener('click', function(e) {
+        document.getElementById('clearButton').addEventListener('click', function (e) {
             e.preventDefault();
             clearCanvas();
         });
 
-        let qualtricsId = "unknown";
-
-        if (typeof Qualtrics !== 'undefined' && typeof Qualtrics.SurveyEngine !== 'undefined') {
-            qualtricsId = Qualtrics.SurveyEngine.getEmbeddedData('qualtricsID');
-            console.log("Qualtrics ID: ", qualtricsId);
-        } else {
-            console.log("Qualtrics not detected. Using default ID.");
-        }
-
         function sendBase64ToPipedream() {
-            const myCanvas = document.getElementById('drawingCanvas');
-            if (myCanvas) {
-                const dataURL = myCanvas.toDataURL('image/png');
-                const base64Data = dataURL.replace(/^data:image\/(png|jpeg);base64,/, '');
+            const dataURL = canvas.toDataURL('image/png');
+            const base64Data = dataURL.replace(/^data:image\/(png|jpeg);base64,/, '');
+            const pipedreamEndpoint = 'https://eoei8lx0gt8zd0l.m.pipedream.net';
 
-                const pipedreamEndpoint = 'https://eoei8lx0gt8zd0l.m.pipedream.net';
+            console.log("Sending to Pipedream with uniqueId:", uniqueId);
 
-                console.log("Sending to Pipedream with uniqueId:", uniqueId);
-
-                fetch(pipedreamEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        imageData: base64Data,
-                        uniqueId: uniqueId || "missing-id"
-                    })
+            fetch(pipedreamEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    imageData: base64Data,
+                    uniqueId: uniqueId || "missing-id"
                 })
+            })
                 .then(response => {
                     if (response.ok) {
                         console.log('Base64 data sent to Pipedream successfully!');
@@ -222,48 +191,40 @@
                 .catch(error => {
                     console.error('Error sending Base64 data to Pipedream:', error);
                 });
+        }
+
+        const saveButton = document.getElementById('saveButton');
+        if (saveButton) {
+            saveButton.addEventListener('click', sendBase64ToPipedream);
+        }
+
+        function handleOrientationChange() {
+            if (localStorage.getItem('canvasData')) {
+                const savedData = JSON.parse(localStorage.getItem('canvasData'));
+                const img = new Image();
+                img.onload = function () {
+                    setCanvasSize();
+                    ctx.drawImage(img, 0, 0, savedData.width, savedData.height, 0, 0, canvas.width, canvas.height);
+                };
+                img.src = savedData.data;
             } else {
-                console.error('Canvas element not found.');
+                setCanvasSize();
             }
         }
 
-        var saveButton = document.getElementById("saveButton");
-        if (saveButton) {
-            saveButton.addEventListener("click", sendBase64ToPipedream);
-        } else {
-            console.error("Save button not found");
-        }
-
-        function saveCanvasToStorage() {
+        window.addEventListener('orientationchange', function () {
             localStorage.setItem('canvasData', JSON.stringify({
                 data: canvas.toDataURL(),
                 width: canvas.width,
                 height: canvas.height
             }));
-        }
-
-        function restoreCanvasFromStorage() {
-            if (localStorage.getItem('canvasData')) {
-                var savedData = JSON.parse(localStorage.getItem('canvasData'));
-                var img = new Image();
-                img.onload = function() {
-                    ctx.drawImage(img, 0, 0, canvas.width / resolutionMultiplier, canvas.height / resolutionMultiplier);
-                };
-                img.src = savedData.data;
-            }
-        }
-
-        window.addEventListener('orientationchange', function() {
-            saveCanvasToStorage();
-            setTimeout(() => {
-                setCanvasSize();
-                restoreCanvasFromStorage();
-            }, 200);
+            handleOrientationChange();
         });
 
-        restoreCanvasFromStorage();
+        if (localStorage.getItem('canvasData')) {
+            handleOrientationChange();
+        }
     }
 
     initCanvas();
 })();
-
