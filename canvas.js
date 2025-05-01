@@ -7,11 +7,14 @@
     }
 
     let uniqueId = null;
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryDelay = 500;
 
     // Receive uniqueId from parent
     window.addEventListener('message', function (event) {
       if (event.data && event.data.type === 'setUniqueId') {
-        console.log("Received uniqueId from parent:", event.data.uniqueId);
+        console.log("✅ Received uniqueId from parent:", event.data.uniqueId);
         uniqueId = event.data.uniqueId;
       }
     }, false);
@@ -44,7 +47,7 @@
       canvas.style.width = width + 'px';
       canvas.style.height = height + 'px';
 
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(scale, scale);
     }
 
@@ -102,7 +105,6 @@
     canvas.addEventListener('mouseup', () => isDrawing = false);
     canvas.addEventListener('mouseout', () => isDrawing = false);
 
-    // Touch support
     function getTouchPos(e) {
       const rect = canvas.getBoundingClientRect();
       const touch = e.touches[0];
@@ -144,7 +146,6 @@
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
-    // UI Handlers
     document.getElementById('colorPicker').addEventListener('input', function () {
       setBrushColor(this.value);
     });
@@ -164,25 +165,40 @@
       clearCanvas();
     });
 
-    // Save to Pipedream
     function sendBase64ToPipedream() {
+      if (!uniqueId) {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.warn(`[!] uniqueId not yet found, retrying... (${retryCount}/${maxRetries})`);
+          setTimeout(sendBase64ToPipedream, retryDelay);
+        } else {
+          console.error("❌ uniqueId still missing after retries. Sending with 'missing-id'.");
+          doSend("missing-id");
+        }
+        return;
+      }
+      doSend(uniqueId);
+    }
+
+    function doSend(idToUse) {
       const dataURL = canvas.toDataURL('image/png');
       const base64Data = dataURL.replace(/^data:image\/(png|jpeg);base64,/, '');
 
       const pipedreamEndpoint = 'https://eoei8lx0gt8zd0l.m.pipedream.net';
-      console.log("Sending to Pipedream with uniqueId:", uniqueId);
+      console.log("📤 Sending drawing to Pipedream...");
+      console.log("📎 uniqueId:", idToUse);
 
       fetch(pipedreamEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageData: base64Data,
-          uniqueId: uniqueId || "missing-id"
+          uniqueId: idToUse
         })
       })
         .then(response => {
           if (response.ok) {
-            console.log('✅ Sent to Pipedream');
+            console.log('✅ Successfully sent to Pipedream.');
             const msg = document.getElementById('saveMessage');
             if (msg) {
               msg.style.display = 'block';
@@ -195,7 +211,7 @@
               }, 2000);
             }
           } else {
-            console.error('❌ Failed to send to Pipedream');
+            console.error('❌ Failed to send to Pipedream.');
           }
         })
         .catch(error => {
@@ -208,9 +224,7 @@
       saveButton.addEventListener("click", sendBase64ToPipedream);
     }
 
-    // Redraw on orientation change
     function handleOrientationChange() {
-      console.log("🔄 Orientation change detected");
       if (localStorage.getItem('canvasData')) {
         const savedData = JSON.parse(localStorage.getItem('canvasData'));
         const img = new Image();
@@ -227,7 +241,6 @@
     }
 
     window.addEventListener('orientationchange', function () {
-      console.log("💾 Saving canvas data");
       localStorage.setItem('canvasData', JSON.stringify({
         data: canvas.toDataURL(),
         width: canvas.width,
@@ -243,3 +256,4 @@
 
   initCanvas();
 })();
+
