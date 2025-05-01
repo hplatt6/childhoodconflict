@@ -6,16 +6,15 @@
             return;
         }
 
-        // Near the top of your initCanvas function, add:
-let uniqueId = null;
+        let uniqueId = null;
 
-// Add message listener to receive uniqueId from parent
-window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'setUniqueId') {
-        console.log("Received uniqueId from parent:", event.data.uniqueId);
-        uniqueId = event.data.uniqueId;
-    }
-}, false);
+        // Add message listener to receive uniqueId from parent
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'setUniqueId') {
+                console.log("Received uniqueId from parent:", event.data.uniqueId);
+                uniqueId = event.data.uniqueId;
+            }
+        }, false);
 
         var ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -28,8 +27,20 @@ window.addEventListener('message', function(event) {
         var brushSize = 5;
 
         function setCanvasSize() {
-            canvas.width = document.getElementById('canvasContainer').offsetWidth;
-            canvas.height = canvas.offsetWidth / 3 * 5;
+            const container = document.getElementById('canvasContainer');
+            const displayWidth = container.offsetWidth;
+            const displayHeight = displayWidth * 3 / 5;
+            const dpr = window.devicePixelRatio || 1;
+
+            canvas.width = displayWidth * dpr;
+            canvas.height = displayHeight * dpr;
+            canvas.style.width = `${displayWidth}px`;
+            canvas.style.height = `${displayHeight}px`;
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transform
+            ctx.scale(dpr, dpr);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
         }
 
         setCanvasSize();
@@ -154,16 +165,15 @@ window.addEventListener('message', function(event) {
             clearCanvas();
         });
 
-        let qualtricsId = "unknown"; // Default value
+        let qualtricsId = "unknown";
 
         if (typeof Qualtrics !== 'undefined' && typeof Qualtrics.SurveyEngine !== 'undefined') {
-            qualtricsId = Qualtrics.SurveyEngine.getEmbeddedData('qualtricsID'); // Replace 'qualtricsID' with your embedded data name.
+            qualtricsId = Qualtrics.SurveyEngine.getEmbeddedData('qualtricsID');
             console.log("Qualtrics ID: ", qualtricsId);
         } else {
             console.log("Qualtrics not detected. Using default ID.");
         }
 
-        // Modified sendBase64ToPipedream function
         function sendBase64ToPipedream() {
             const myCanvas = document.getElementById('drawingCanvas');
             if (myCanvas) {
@@ -171,7 +181,7 @@ window.addEventListener('message', function(event) {
                 const base64Data = dataURL.replace(/^data:image\/(png|jpeg);base64,/, '');
 
                 const pipedreamEndpoint = 'https://eoei8lx0gt8zd0l.m.pipedream.net';
-                
+
                 console.log("Sending to Pipedream with uniqueId:", uniqueId);
 
                 fetch(pipedreamEndpoint, {
@@ -181,25 +191,22 @@ window.addEventListener('message', function(event) {
                     },
                     body: JSON.stringify({
                         imageData: base64Data,
-                        uniqueId: uniqueId || "missing-id" // Provide fallback
+                        uniqueId: uniqueId || "missing-id"
                     })
                 })
                 .then(response => {
                     if (response.ok) {
                         console.log('Base64 data sent to Pipedream successfully!');
-                        
-                        // Show save message
                         const msg = document.getElementById('saveMessage');
                         if (msg) {
                             msg.style.display = 'block';
                             msg.style.opacity = '1';
-                    
                             setTimeout(() => {
                                 msg.style.opacity = '0';
                                 setTimeout(() => {
                                     msg.style.display = 'none';
-                                }, 500); // Match transition time
-                            }, 2000); // Show message for 2 seconds
+                                }, 500);
+                            }, 2000);
                         }
                     } else {
                         console.error('Failed to send Base64 data to Pipedream.');
@@ -212,7 +219,6 @@ window.addEventListener('message', function(event) {
                 console.error('Canvas element not found.');
             }
         }
-
 
         var saveButton = document.getElementById("saveButton");
         if (saveButton) {
@@ -229,18 +235,18 @@ window.addEventListener('message', function(event) {
 
                 img.onload = function() {
                     console.log("Image loaded, resizing canvas and redrawing");
-                    setTimeout(function() { // Add delay
+                    setTimeout(function() {
                         console.log("Delay finished, resizing canvas and redrawing");
-                        setCanvasSize(); // Resize canvas
-                        ctx.drawImage(img, 0, 0, savedData.width, savedData.height, 0, 0, canvas.width, canvas.height); // Draw scaled image
+                        setCanvasSize();
+                        ctx.drawImage(img, 0, 0, savedData.width, savedData.height, 0, 0, canvas.width, canvas.height);
                         console.log("Redraw complete");
-                    }, 100); // 100ms delay
+                    }, 100);
                 };
 
                 img.src = savedData.data;
             } else {
                 console.log("No saved data, resizing canvas");
-                setCanvasSize(); // Just resize if no saved data
+                setCanvasSize();
             }
         }
 
@@ -256,9 +262,8 @@ window.addEventListener('message', function(event) {
 
         if (localStorage.getItem('canvasData')) {
             console.log("Restoring canvas data on initial load");
-            handleOrientationChange(); // Restore on initial load
+            handleOrientationChange();
         }
     }
     initCanvas();
 })();
-
